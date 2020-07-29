@@ -14,18 +14,16 @@ fn main() {
     let mut rng = rand::thread_rng();
     let mut num: usize= rng.gen_range(0,input.nrows());
     println!("Input record #{} has a label of {}",num,output.slice(s![num,..]));
-    let img_vec = input.slice(s![num,..]).clone().to_owned().into_shape((784)).unwrap().to_vec().iter().map(|x| (*x * 255.) as u32).collect();
-    display_img(img_vec);
+    display_img(input.slice(s![num,..]).to_owned());
 
     num = rng.gen_range(0,test_input.nrows());
     println!("Test record #{} has a label of {}",num,test_output.slice(s![num,..]));
-    let img_vec = test_input.slice(s![num,..]).clone().to_owned().into_shape((784)).unwrap().to_vec().iter().map(|x| (*x * 255.) as u32).collect();
-    display_img(img_vec);
+    display_img(test_input.slice(s![num,..]).to_owned());
     
-    let mut dnn = DeepNeuralNetwork::default(input, output, vec![784,128,64,10]);    
-    dnn.train();
-    let test_result = dnn.evaluate(test_input);
-    compare_results(test_result, test_output);
+    //let mut dnn = DeepNeuralNetwork::default(input, output, vec![784,128,64,10]);    
+    //dnn.train();
+    //let test_result = dnn.evaluate(test_input);
+    //compare_results(test_result, test_output);
 
 }
 
@@ -208,7 +206,17 @@ fn mnist_as_ndarray() -> (Array2<f32>,Array2<f32>,Array2<f32>,Array2<f32>) {
     (trn_img, trn_lbl, tst_img, tst_lbl)
 }
 
-fn display_img(mut buffer: Vec<u32>) {
+fn display_img(input: Array1<f32>) {
+
+    let img_vec: Vec<u8> = input.to_vec().iter().map(|x| (*x * 256.) as u8).collect();
+    // println!("img_vec: {:?}",img_vec);
+    let mut buffer: Vec<u32> = Vec::with_capacity(28*28);
+    for px in 0..784 {
+            let temp: [u8; 4] = [img_vec[px], img_vec[px], img_vec[px], 255u8];
+            // println!("temp: {:?}",temp);
+            buffer.push(u32::from_le_bytes(temp));
+    }
+
     let (window_width, window_height) = (600, 600);
     let mut window = Window::new(
         "Test - ESC to exit",
