@@ -3,7 +3,8 @@ use ndarray::prelude::*;
 use ndarray_rand::{RandomExt, rand_distr::Uniform};
 use rand::prelude::*;
 use ndarray_stats::QuantileExt;
-use minifb::{Key, Window, WindowOptions, ScaleMode};
+use image::*;
+use show_image::{make_window_full, Event, WindowOptions};
 
 fn main() {
     
@@ -14,16 +15,12 @@ fn main() {
     let mut rng = rand::thread_rng();
     let mut num: usize= rng.gen_range(0,input.nrows());
     println!("Input record #{} has a label of {}",num,output.slice(s![num,..]));
-    display_img(input.slice(s![num,..]).to_owned());
-
-    num = rng.gen_range(0,test_input.nrows());
-    println!("Test record #{} has a label of {}",num,test_output.slice(s![num,..]));
-    display_img(test_input.slice(s![num,..]).to_owned());
+    display_img(input.slice(s![num,..]).to_owned().into_shape((28,28)).unwrap());
     
-    //let mut dnn = DeepNeuralNetwork::default(input, output, vec![784,128,64,10]);    
-    //dnn.train();
-    //let test_result = dnn.evaluate(test_input);
-    //compare_results(test_result, test_output);
+    let mut dnn = DeepNeuralNetwork::default(input, output, vec![784,128,64,10]);    
+    dnn.train();
+    let test_result = dnn.evaluate(test_input);
+    compare_results(test_result, test_output);
 
 }
 
@@ -35,7 +32,7 @@ struct DeepNeuralNetwork {
     learnrate: f32,
     w: Vec<Array2<f32>>,
     z: Vec<Array2<f32>>,
-    a: Vec<Array2<f32>>
+    a: Vec<Array2<f32>>,
 }
 
 impl DeepNeuralNetwork {
@@ -45,11 +42,11 @@ impl DeepNeuralNetwork {
             input: input,
             output: output,
             sizes: sizes,
-            iterations: 3000,
+            iterations: 750,
             learnrate: 0.01,
             w: vec![],
             z: vec![Array::zeros((1,1)); 3],
-            a: vec![Array::zeros((1,1)); 4]
+            a: vec![Array::zeros((1,1)); 4],
         };
         dnn.w.push(Array::random((784, 128),Uniform::new(-0.1, 0.1)));
         dnn.w.push(Array::random((128, 64),Uniform::new(-0.2, 0.2)));
@@ -206,41 +203,45 @@ fn mnist_as_ndarray() -> (Array2<f32>,Array2<f32>,Array2<f32>,Array2<f32>) {
     (trn_img, trn_lbl, tst_img, tst_lbl)
 }
 
-fn display_img(input: Array1<f32>) {
+fn display_img(input: Array2<f32>) {
+    let output_img = bw_ndarray2_to_image(input);
+    let window_options = WindowOptions {
+        name: "image".to_string(),
+        size: [300, 300],
+        resizable: true,
+        preserve_aspect_ratio: true,
+    };
+    println!("\nPlease hit [ ESC ] to quit window:");
+    let window = make_window_full(window_options).unwrap();
+    window.set_image(output_img, "test_result").unwrap();
 
-    let img_vec: Vec<u8> = input.to_vec().iter().map(|x| (*x * 256.) as u8).collect();
-    // println!("img_vec: {:?}",img_vec);
-    let mut buffer: Vec<u32> = Vec::with_capacity(28*28);
-    for px in 0..784 {
-            let temp: [u8; 4] = [img_vec[px], img_vec[px], img_vec[px], 255u8];
-            // println!("temp: {:?}",temp);
-            buffer.push(u32::from_le_bytes(temp));
+    for event in window.events() {
+        if let Event::KeyboardEvent(event) = event {
+            if event.key == show_image::KeyCode::Escape {
+                break;
+            }
+        }
     }
 
-    let (window_width, window_height) = (600, 600);
-    let mut window = Window::new(
-        "Test - ESC to exit",
-        window_width,
-        window_height,
-        WindowOptions {
-            resize: true,
-            scale_mode: ScaleMode::Center,
-            ..WindowOptions::default()
-        },
-    )
-    .unwrap_or_else(|e| {
-        panic!("{}", e);
-    });
+    show_image::stop().unwrap();
+}
 
-    // Limit to max ~60 fps update rate
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
-    while window.is_open() && !window.is_key_down(Key::Escape) && !window.is_key_down(Key::Q) {
-        // We unwrap here as we want this code to exit if it fails. Real applications may want to handle this in a different way
-        window
-            .update_with_buffer(&buffer, 28, 28)
-            .unwrap();
+/// Helper function for transition from an normalized NdArray3<f32> structure to an `Image::RgbImage`
+fn bw_ndarray2_to_image(arr: Array2<f32>) -> RgbImage {
+    assert!(arr.is_standard_layout());
+
+    println!("{:?}",arr.dim());
+    let (height, width) = arr.dim();
+    println!("producing an image of size: ({},{})",width, height);
+    let mut img: RgbImage = ImageBuffer::new(width as u32, height as u32);
+    for y in 0..height {
+        for x in 0..width {
+            let val = (arr[[y,x]] * 255.) as u8;
+            img.put_pixel(x as u32, y as u32, image::Rgb([val, val, val]));
+        }
     }
+    img
 }
 
 

@@ -12,4 +12,5 @@ mnist = "0.4"
 rand = "0.7"
 ndarray-rand = "0.11.0"
 ndarray-stats = "0.3"
-minifb = "0.17"
+image = "0.23"
+show-image = {version = "0.6.4", features = ["image"]}
